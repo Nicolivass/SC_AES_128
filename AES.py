@@ -3,10 +3,6 @@ from argparse import ArgumentParser
 from enum import Enum
 
 
-class Mode(Enum):
-    ECB = 'ECB'
-    CTR = 'CTR'
-
 #tabela de substituição da subBytes
 s_box = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -265,7 +261,7 @@ def cifragem_ctr(states, expanded_key, rounds, iv):
     return blocks
 
 
-def cifra(message: bytes, key: bytes, mode=Mode.CTR, iv: bytes = None, rounds=11):
+def cifra(message: bytes, key: bytes, iv: bytes = None, rounds=11):
     expanded_key = expand_key(key, rounds)
     padded_message = preenche_messagem(message)
     states = divide_mensagem(padded_message)
@@ -275,11 +271,7 @@ def cifra(message: bytes, key: bytes, mode=Mode.CTR, iv: bytes = None, rounds=11
     logging.info('Chave: ' + bytes_to_hex_string(key))
     logging.info('Numero de Blocos: ' + str(len(states)))
 
-    if mode == Mode.ECB:
-        encrypted_blocks = [cifragem_bloco(
-            state, expanded_key, rounds) for state in states]
-    elif mode == Mode.CTR:
-        encrypted_blocks = cifragem_ctr(states, expanded_key, rounds, iv)
+    encrypted_blocks = cifragem_ctr(states, expanded_key, rounds, iv)
 
     encrypted_message = combina_blocos(encrypted_blocks)
 
@@ -307,7 +299,7 @@ def decifra_bloco(state: bytes, expanded_key: bytes, rounds=11):
     return state
 
 
-def decifra(message: bytes, key: bytes, mode=Mode.ECB, iv: bytes = None, rounds=11):
+def decifra(message: bytes, key: bytes, iv: bytes = None, rounds=11):
     expanded_key = expand_key(key, rounds)
     states = divide_mensagem(message)
 
@@ -316,11 +308,7 @@ def decifra(message: bytes, key: bytes, mode=Mode.ECB, iv: bytes = None, rounds=
     logging.info('Chave: ' + bytes_to_hex_string(key))
     logging.info('Numero de Blocos: ' + str(len(states)))
 
-    if mode == Mode.ECB:
-        decrypted_blocks = [decifra_bloco(
-            state, expanded_key, rounds) for state in states]
-    elif mode == Mode.CTR:
-        decrypted_blocks = cifragem_ctr(states, expanded_key, rounds, iv)
+    decrypted_blocks = cifragem_ctr(states, expanded_key, rounds, iv)
 
     decrypted_message = combina_blocos(decrypted_blocks)
     decrypted_message = restaura_mensagem(decrypted_message)
@@ -356,8 +344,6 @@ if __name__ == '__main__':
     parser.add_argument('-k', '--key', type=str, required=True)
     parser.add_argument('-iv', type=str)
     parser.add_argument('-r', '--rounds', type=int, default=11)
-    parser.add_argument('-m', '--mode', type=str, choices=[
-                        Mode.ECB.name, Mode.CTR.name], default=Mode.ECB.name)
     parser.add_argument(
         '-v', '--verbose', action='store_true', dest='verbose_flag')
     args = parser.parse_args()
@@ -372,17 +358,14 @@ if __name__ == '__main__':
     key = bytes.fromhex(ajusta_string(args.key, 32))
     iv = bytes.fromhex(ajusta_string(args.iv, 32)) if args.iv else None
     rounds = args.rounds
-    mode = args.mode
 
     if encrypt_flag or decrypt_flag:
         with open(input_file, 'rb') as f:
             message = f.read()
 
             if encrypt_flag:
-                output_data = cifra(message, key,
-                                      Mode[mode], iv, rounds)
+                output_data = cifra(message, key, iv, rounds)
             else:
-                output_data = decifra(message, key,
-                                      Mode[mode], iv, rounds)
+                output_data = decifra(message, key, iv, rounds)
             with open(output_file, 'wb') as f:
                 f.write(output_data)
