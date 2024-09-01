@@ -43,6 +43,13 @@ inversa_s_box = (
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D
 )
 
+def sub_bytes(state):
+    return [s_box[b] for b in state]
+
+
+def inversa_sub_bytes(state):
+    return [inversa_s_box[b] for b in state]
+
 #constantes da expansão de chaves 
 round_constants = (
     0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a,
@@ -117,6 +124,27 @@ L = (
     0x67, 0x4A, 0xED, 0xDE, 0xC5, 0x31, 0xFE, 0x18, 0x0D, 0x63, 0x8C, 0x80, 0xC0, 0xF7, 0x70, 0x07
 )
 
+#rotação à esquerda
+def rotaciona_word(word):
+    return word[1:] + word[:1]
+
+#geração de chave expandida
+def expand_key(key, rounds):
+    expanded_key = []
+    expanded_key += key
+
+    for i in range(4, 4 * rounds):
+        temp = expanded_key[-4:]
+        if i % 4 == 0:
+            temp = rotaciona_word(temp)
+            temp = sub_bytes(temp)
+            temp[0] ^= round_constants[(i // 4) - 1]
+
+        for j in range(4):
+            temp[j] ^= expanded_key[-16 + j]
+
+        expanded_key += temp
+    return expanded_key
 
 def shift_rows(state):
     return [
@@ -134,10 +162,6 @@ def inv_shift_rows(state):
         state[8], state[5], state[2], state[15],
         state[12], state[9], state[6], state[3]
     ]
-
-
-def add_round_key(state, round_key):
-    return [state[i] ^ round_key[i] for i in range(16)]
 
 
 #multiplicação de 2 elementos no campo finito (galois field)
@@ -159,38 +183,11 @@ def mix_columns(state, matriz):
         state[i * 4 + 3] = galois_mult(matriz[3][0], column[0]) ^ galois_mult(matriz[3][1], column[1]) ^ galois_mult(matriz[3][2], column[2]) ^ galois_mult(matriz[3][3], column[3])
     return state
 
-#rotação à esquerda
-def rotaciona_word(word):
-    return word[1:] + word[:1]
-
-
-def sub_bytes(state):
-    return [s_box[b] for b in state]
-
-
-def inversa_sub_bytes(state):
-    return [inversa_s_box[b] for b in state]
-
-#geração de chave expandida
-def expand_key(key, rounds):
-    expanded_key = []
-    expanded_key += key
-
-    for i in range(4, 4 * rounds):
-        temp = expanded_key[-4:]
-        if i % 4 == 0:
-            temp = rotaciona_word(temp)
-            temp = sub_bytes(temp)
-            temp[0] ^= round_constants[(i // 4) - 1]
-
-        for j in range(4):
-            temp[j] ^= expanded_key[-16 + j]
-
-        expanded_key += temp
-    return expanded_key
+def add_round_key(state, round_key):
+    return [state[i] ^ round_key[i] for i in range(16)]
 
 #criptografia de um único bloco 
-def cifragem_bloco(state: bytes, expanded_key: bytes, rounds: int):
+def cifra_bloco(state: bytes, expanded_key: bytes, rounds: int):
     geração_round_key = (expanded_key[i * 16: i * 16 + 16] for i in range(rounds))
     state = add_round_key(state, next(geração_round_key))
     if rounds <= 1:
@@ -242,7 +239,7 @@ def gera_fluxo_chaves(expanded_key: bytes, rounds: int, iv: bytes, n: int):
     counter = int.from_bytes(iv, byteorder='big')
     for _ in range(n):
         counter_block = counter.to_bytes(16, byteorder='big')
-        keystream = cifragem_bloco(counter_block, expanded_key, rounds)
+        keystream = cifra_bloco(counter_block, expanded_key, rounds)
         keystreams.append(keystream)
         counter += 1
     return keystreams
